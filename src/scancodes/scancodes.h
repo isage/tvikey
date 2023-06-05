@@ -1,0 +1,65 @@
+#ifndef __SCANCODES_H__
+#define __SCANCODES_H__
+
+#undef BINDING
+#define BINDING(sc, code, name) sc = code,
+
+typedef enum
+{
+#include "kb_scancodes.h"
+} KbScancode;
+
+typedef enum
+{
+  KB_MODIFIER_LEFTCTRL   = (1 << 0), // 1
+  KB_MODIFIER_LEFTSHIFT  = (1 << 1), // 2
+  KB_MODIFIER_LEFTALT    = (1 << 2), // 4
+  KB_MODIFIER_LEFTGUI    = (1 << 3), // 8
+  KB_MODIFIER_RIGHTCTRL  = (1 << 4), // 16
+  KB_MODIFIER_RIGHTSHIFT = (1 << 5), // 32
+  KB_MODIFIER_RIGHTALT   = (1 << 6), // 64
+  KB_MODIFIER_RIGHTGUI   = (1 << 7)  // 128
+} KbScancodeMod;
+
+typedef enum
+{
+  MS_SCANCODE_1,
+  MS_SCANCODE_2,
+  MS_SCANCODE_3,
+  MS_SCANCODE_XM,
+  MS_SCANCODE_XP,
+  MS_SCANCODE_YM,
+  MS_SCANCODE_YP,
+} MouseScancode;
+
+typedef enum
+{
+  V_SCANCODE_DUP = 0x01,
+  V_SCANCODE_DDOWN,
+  V_SCANCODE_DLEFT,
+  V_SCANCODE_DRIGHT,
+  V_SCANCODE_CROSS,
+  V_SCANCODE_SQUARE,
+  V_SCANCODE_TRIANGLE,
+  V_SCANCODE_CIRCLE,
+  V_SCANCODE_SELECT,
+  V_SCANCODE_START,
+  V_SCANCODE_L1,
+  V_SCANCODE_L2,
+  V_SCANCODE_L3,
+  V_SCANCODE_R1,
+  V_SCANCODE_R2,
+  V_SCANCODE_R3,
+  V_SCANCODE_LXM,
+  V_SCANCODE_LXP,
+  V_SCANCODE_LYM,
+  V_SCANCODE_LYP,
+  V_SCANCODE_RXM,
+  V_SCANCODE_RXP,
+  V_SCANCODE_RYM,
+  V_SCANCODE_RYP,
+  V_SCANCODE_PS,
+  V_SCANCODE_UNKNOWN = 0xFF,
+} VitaScancode;
+
+#endif
