@@ -23,5 +23,5 @@ MIT, see LICENSE.md
 
 ## Credits
 
-* **(CreepNT)[https://github.com/CreepNT/]** - help and support
+* **[CreepNT](https://github.com/CreepNT/)** - help and support
 * **CBPS discord** - for support and stupid ideas
