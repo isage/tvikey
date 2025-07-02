@@ -12,7 +12,7 @@
 #include <psp2kern/kernel/suspend.h>
 #include <psp2kern/kernel/sysclib.h>
 #include <psp2kern/kernel/sysroot.h>
-#include <psp2kern/sblaimgr.h>
+#include <psp2kern/kernel/aimgr.h>
 #include <psp2kern/usbd.h>
 #include <psp2kern/usbserv.h>
 #include <taihen.h>

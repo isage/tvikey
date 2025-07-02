@@ -26,7 +26,7 @@ Copyright (C) 2023, Cat
 
 #include <psp2kern/io/fcntl.h>
 #include <psp2kern/kernel/debug.h>
-#include <psp2kern/kernel/sysclib.h>
+//#include <psp2kern/kernel/sysclib.h>
 
 char *scefgets(char *s, int n, SceUID iop)
 {
