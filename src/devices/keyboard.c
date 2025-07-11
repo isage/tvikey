@@ -84,45 +84,54 @@ uint8_t Keyboard_attach(InputDevice *c, int device_id, int port)
 #if defined(DEBUG)
       ksceDebugPrintf("opening in pipe\n");
 #endif
-      c->pipe_in = ksceUsbdOpenPipe(device_id, endpoint);
-#if defined(DEBUG)
-      ksceDebugPrintf("= 0x%08x\n", c->pipe_in);
-      ksceDebugPrintf("bmAttributes = %x\n", endpoint->bmAttributes);
-#endif
       c->buffer_size = endpoint->wMaxPacketSize;
       if (c->buffer_size > 64)
       {
         ksceDebugPrintf("Packet size too big = %d\n", endpoint->wMaxPacketSize);
         return 0;
       }
-    }
-    if (c->pipe_in > 0)
+      c->pipe_in = ksceUsbdOpenPipe(device_id, endpoint);
+#if defined(DEBUG)
+      ksceDebugPrintf("= 0x%08x\n", c->pipe_in);
+      ksceDebugPrintf("bmAttributes = %x\n", endpoint->bmAttributes);
+#endif
       break;
+    }
     endpoint
         = (SceUsbdEndpointDescriptor *)ksceUsbdScanStaticDescriptor(device_id, endpoint, SCE_USBD_DESCRIPTOR_ENDPOINT);
   }
 
-  if (c->pipe_in > 0)
+  if (!c->pipe_in)
+    return 0;
+
+  SceUsbdConfigurationDescriptor *cdesc;
+  if ((cdesc = (SceUsbdConfigurationDescriptor *)ksceUsbdScanStaticDescriptor(device_id, NULL,
+                                                                              SCE_USBD_DESCRIPTOR_CONFIGURATION))
+      == NULL)
   {
-    SceUsbdConfigurationDescriptor *cdesc;
-    if ((cdesc = (SceUsbdConfigurationDescriptor *)ksceUsbdScanStaticDescriptor(device_id, NULL,
-                                                                                SCE_USBD_DESCRIPTOR_CONFIGURATION))
-        == NULL)
-      return 0;
-
-    SceUID control_pipe_id = ksceUsbdOpenPipe(device_id, NULL);
-    c->pipe_control        = control_pipe_id;
-    // set default config
-    int r = ksceUsbdSetConfiguration(control_pipe_id, cdesc->bConfigurationValue, kb_cfg_done, c);
-#if defined(DEBUG)
-    ksceDebugPrintf("ksceUsbdSetConfiguration = 0x%08x\n", r);
-#endif
-    if (r < 0)
-      return 0;
-
-    c->attached = 1;
-    c->inited   = 1;
+    ksceUsbdClosePipe(c->pipe_in);
+    c->pipe_in = 0;
+    return 0;
   }
+
+  SceUID control_pipe_id = ksceUsbdOpenPipe(device_id, NULL);
+  c->pipe_control = control_pipe_id;
+  // set default config
+  int r = ksceUsbdSetConfiguration(control_pipe_id, cdesc->bConfigurationValue, kb_cfg_done, c);
+#if defined(DEBUG)
+  ksceDebugPrintf("ksceUsbdSetConfiguration = 0x%08x\n", r);
+#endif
+  if (r < 0)
+  {
+    ksceUsbdClosePipe(c->pipe_control);
+    c->pipe_control = 0;
+    ksceUsbdClosePipe(c->pipe_in);
+    c->pipe_in = 0;
+    return 0;
+  }
+
+  c->attached = 1;
+  c->inited   = 1;
 
   usb_read(c);
   return 1;

@@ -12,7 +12,7 @@
 #include <psp2kern/kernel/suspend.h>
 #include <psp2kern/kernel/sysclib.h>
 #include <psp2kern/kernel/sysroot.h>
-#include <psp2kern/sblaimgr.h>
+#include <psp2kern/kernel/aimgr.h>
 #include <psp2kern/usbd.h>
 #include <psp2kern/usbserv.h>
 #include <taihen.h>
@@ -179,6 +179,7 @@ int libtvikey_probe(int device_id)
 
 int libtvikey_attach(int device_id)
 {
+  int status = SCE_USBD_ATTACH_FAILED;
   SceUsbdDeviceDescriptor *device;
   ksceDebugPrintf("attaching device: %x\n", device_id);
   device = (SceUsbdDeviceDescriptor *)ksceUsbdScanStaticDescriptor(device_id, 0, SCE_USBD_DESCRIPTOR_DEVICE);
@@ -187,7 +188,7 @@ int libtvikey_attach(int device_id)
     ksceDebugPrintf("vendor: %04x\n", device->idVendor);
     ksceDebugPrintf("product: %04x\n", device->idProduct);
     int i;
-
+    for (int type = MOUSE; type <= KEYBOARD; type++)
     {
       int cont = -1;
 
@@ -202,40 +203,64 @@ int libtvikey_attach(int device_id)
       }
 
       if (cont == -1)
-        return SCE_USBD_ATTACH_FAILED;
+        break;
 
       if (!devices[cont].attached)
       {
-        if (Mouse_attach(&devices[cont], device_id, cont))
+        switch (type)
         {
-          // something gone wrong during usb init
-          if (!devices[cont].inited)
-          {
-            ksceDebugPrintf("Can't init mouse\n");
-            return SCE_USBD_ATTACH_FAILED;
-          }
-          ksceDebugPrintf("Attached!\n");
-          return SCE_USBD_ATTACH_SUCCEEDED;
-        }
-        else if (Keyboard_attach(&devices[cont], device_id, cont))
-        {
-          // something gone wrong during usb init
-          if (!devices[cont].inited)
-          {
-            ksceDebugPrintf("Can't init kb\n");
-            return SCE_USBD_ATTACH_FAILED;
-          }
-          ksceDebugPrintf("Attached!\n");
-          return SCE_USBD_ATTACH_SUCCEEDED;
+          case MOUSE:
+            if (Mouse_attach(&devices[cont], device_id, cont))
+            {
+              // something gone wrong during usb init
+              if (!devices[cont].inited)
+              {
+                ksceDebugPrintf("Can't init mouse\n");
+              }
+              else
+              {
+                ksceDebugPrintf("Attached mouse!\n");
+                status = SCE_USBD_ATTACH_SUCCEEDED;
+                // loop to next device type and find next slot
+                continue;
+              }
+            }
+
+            // try next device type on this slot
+            type++;
+            // fallthrough
+          case KEYBOARD:
+            if (Keyboard_attach(&devices[cont], device_id, cont))
+            {
+              // something gone wrong during usb init
+              if (!devices[cont].inited)
+              {
+                ksceDebugPrintf("Can't init kb\n");
+              }
+              else
+              {
+                ksceDebugPrintf("Attached kb!\n");
+                status = SCE_USBD_ATTACH_SUCCEEDED;
+                // loop to next device type and find next slot
+                continue;
+              }
+            }
+
+            // try next device type on this slot
+            type++;
+            // fallthrough
+          default:
+            break;
         }
       }
     }
   }
-  return SCE_USBD_ATTACH_FAILED;
+  return status;
 }
 
 int libtvikey_detach(int device_id)
 {
+  int status = SCE_USBD_DETACH_FAILED;
 
   for (int i = 0; i < MAX_DEVICES; i++)
   {
@@ -243,14 +268,26 @@ int libtvikey_detach(int device_id)
     {
       devices[i].attached     = 0;
       devices[i].inited       = 0;
+      if (devices[i].pipe_in > 0)
+      {
+        ksceUsbdClosePipe(devices[i].pipe_in);
+      }
       devices[i].pipe_in      = 0;
+      if (devices[i].pipe_out > 0)
+      {
+        ksceUsbdClosePipe(devices[i].pipe_out);
+      }
       devices[i].pipe_out     = 0;
+      if (devices[i].pipe_control > 0)
+      {
+        ksceUsbdClosePipe(devices[i].pipe_control);
+      }
       devices[i].pipe_control = 0;
-      return SCE_USBD_DETACH_SUCCEEDED;
+      status = SCE_USBD_DETACH_SUCCEEDED;
     }
   }
 
-  return SCE_USBD_DETACH_FAILED;
+  return status;
 }
 
 static int libtvikey_sysevent_handler(int resume, int eventid, void *args, void *opt)
@@ -607,11 +644,7 @@ int module_start(SceSize args, void *argp)
 
   last_loaded_pid = 0;
 
-  for (int i = 0; i < MAX_DEVICES; i++)
-  {
-    devices[i].inited   = 0;
-    devices[i].attached = 0;
-  }
+  memset(&devices, 0, sizeof(devices));
 
   if (taiGetModuleInfoForKernel(KERNEL_PID, "SceCtrl", &modInfo) < 0)
     return SCE_KERNEL_START_FAILED;
@@ -642,12 +675,13 @@ int module_start(SceSize args, void *argp)
   // fill default config
   load_shell_config();
 
-  int ret_drv = ksceUsbdRegisterDriver(&libtvikeyDriver);
-  ksceDebugPrintf("ksceUsbdRegisterDriver = 0x%08x\n", ret_drv);
-
   // remove sony usb_charge driver that intercepts HID devices
-  ret_drv = ksceUsbdUnregisterDriver(&libtvikeyFakeUsbchargeDriver);
+  // do it before registering this driver so it detaches from any previously plugged devices
+  int ret_drv = ksceUsbdUnregisterDriver(&libtvikeyFakeUsbchargeDriver);
   ksceDebugPrintf("ksceUsbdUnregisterDriver = 0x%08x\n", ret_drv);
+
+  ret_drv = ksceUsbdRegisterDriver(&libtvikeyDriver);
+  ksceDebugPrintf("ksceUsbdRegisterDriver = 0x%08x\n", ret_drv);
 
   ksceKernelRegisterSysEventHandler("ztvikey_sysevent", libtvikey_sysevent_handler, NULL);
 
