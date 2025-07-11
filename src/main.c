@@ -268,8 +268,20 @@ int libtvikey_detach(int device_id)
     {
       devices[i].attached     = 0;
       devices[i].inited       = 0;
+      if (devices[i].pipe_in > 0)
+      {
+        ksceUsbdClosePipe(devices[i].pipe_in);
+      }
       devices[i].pipe_in      = 0;
+      if (devices[i].pipe_out > 0)
+      {
+        ksceUsbdClosePipe(devices[i].pipe_out);
+      }
       devices[i].pipe_out     = 0;
+      if (devices[i].pipe_control > 0)
+      {
+        ksceUsbdClosePipe(devices[i].pipe_control);
+      }
       devices[i].pipe_control = 0;
       status = SCE_USBD_DETACH_SUCCEEDED;
     }
@@ -632,11 +644,7 @@ int module_start(SceSize args, void *argp)
 
   last_loaded_pid = 0;
 
-  for (int i = 0; i < MAX_DEVICES; i++)
-  {
-    devices[i].inited   = 0;
-    devices[i].attached = 0;
-  }
+  memset(&devices, 0, sizeof(devices));
 
   if (taiGetModuleInfoForKernel(KERNEL_PID, "SceCtrl", &modInfo) < 0)
     return SCE_KERNEL_START_FAILED;
@@ -667,12 +675,13 @@ int module_start(SceSize args, void *argp)
   // fill default config
   load_shell_config();
 
-  int ret_drv = ksceUsbdRegisterDriver(&libtvikeyDriver);
-  ksceDebugPrintf("ksceUsbdRegisterDriver = 0x%08x\n", ret_drv);
-
   // remove sony usb_charge driver that intercepts HID devices
-  ret_drv = ksceUsbdUnregisterDriver(&libtvikeyFakeUsbchargeDriver);
+  // do it before registering this driver so it detaches from any previously plugged devices
+  int ret_drv = ksceUsbdUnregisterDriver(&libtvikeyFakeUsbchargeDriver);
   ksceDebugPrintf("ksceUsbdUnregisterDriver = 0x%08x\n", ret_drv);
+
+  ret_drv = ksceUsbdRegisterDriver(&libtvikeyDriver);
+  ksceDebugPrintf("ksceUsbdRegisterDriver = 0x%08x\n", ret_drv);
 
   ksceKernelRegisterSysEventHandler("ztvikey_sysevent", libtvikey_sysevent_handler, NULL);
 
